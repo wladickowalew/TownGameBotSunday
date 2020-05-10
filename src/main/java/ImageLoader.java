@@ -15,7 +15,7 @@ public class ImageLoader {
     private final String SERVER = "https://yandex.ru/images/search";
 
     private int image_count;
-    private ArrayList<URL> imageUrls;
+    private ArrayList<String> imageUrls;
 
     public ImageLoader(String town, int image_count){
         this.image_count = image_count;
@@ -28,23 +28,27 @@ public class ImageLoader {
 
     public Image getNextImage(){
         try {
-            return ImageIO.read(imageUrls.remove(0));
+            return ImageIO.read(new URL(imageUrls.remove(0)));
         } catch (IOException e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    private ArrayList<URL> getImageURLs(String town){
+    public String getNextImageURL(){
+        return imageUrls.remove(0);
+    }
+
+    private ArrayList<String> getImageURLs(String town){
         try{
             String URL = SERVER + "?text=" + town;
             Document html = Jsoup.connect(URL).get();
             Elements imgs = html.select(".serp-item__link img");
             System.out.println(imgs.size());
-            ArrayList<URL> urls = new ArrayList();
+            ArrayList<String> urls = new ArrayList();
             for (Element img: imgs){
                 String url = img.absUrl("src");
-                urls.add(new URL(url));
+                urls.add(url);
             }
             Collections.shuffle(urls);
             urls = new ArrayList(urls.subList(0, image_count));
