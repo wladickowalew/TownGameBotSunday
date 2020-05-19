@@ -2,6 +2,7 @@ import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -15,6 +16,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -32,6 +34,13 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
+    public String getRandomTown(){
+        String[] towns = {"Смоленск","Самара","Лондон","Торонто","Берлин","Токио","Пиза"};
+        int n = towns.length;
+        int r = (int)(Math.random() * n);
+        return  towns[r];
+    }
+
     @Override
     public void onUpdateReceived(Update update) {
         Message message = update.getMessage();
@@ -41,29 +50,29 @@ public class Bot extends TelegramLongPollingBot {
         if (nonAuthorizedUserHandler(message)) return;
         if (conditionHandler(message)) return;
         if (commandHandler(message)) return;
-        sendMessage(message, users.get(id).getName() + " сказал: " + text);
+    }
+
+    private void logOut(Message message){
+        sendMessage(message, "Вы вышли из игры");
+        users.get(message.getChatId()).setCondition("");
     }
 
     private boolean nonAuthorizedUserHandler(Message message) {
         String text = message.getText();
         long id = message.getChatId();
-        if (text.equals("/new_user")) {
-            sendMessage(message, "Привет, как тебя зовут?");
-            User user = new User();
-            users.put(id, user);
-            return true;
-        }
         if (text.equals("/help")) {
             sendMessage(message, textHelp());
             return true;
         }
         if (text.equals("/start")) {
-            sendMessage(message, "Привет, пользователь! Я буду следить за тобой) а ты сам мне всё расскажешь");
+            String name = "No name";
+            users.put(id, new User(message.getChatId(), name));
+            sendMessage(message, "Приветствую тебя, пользователь! Вот, что я могу:");
             sendMessage(message, textHelp());
             return true;
         }
         if (!users.containsKey(id)) {
-            sendMessage(message, "Мы незнакомы");
+            sendMessage(message, "Ты не хочешь со мной играть( введи /start");
             return true;
         }
         return false;
@@ -73,37 +82,23 @@ public class Bot extends TelegramLongPollingBot {
         String text = message.getText();
         long id = message.getChatId();
         User user = users.get(id);
-        if (text.equals("/my_family")) {
-            if (user.getSecondName().equals(""))
-                sendMessage(message, "Я не знаю вашей фамилии");
-            else
-                sendMessage(message, "Ваша фамилия: " + user.getSecondName());
+        if (text.equals("/stop")) {
+            logOut(message);
             return true;
         }
-        if (text.equals("/my_name")) {
-            sendMessage(message, "Ваше имя: " + user.getName());
+        if (text.equals("/start_game")){
+            sendMessage(message, "Привет! Не хочешь ли сыграть в игру?" +
+                    "Тебе предстоит отгадать город на картинке. (Да/Нет)");
+            users.get(id).setCondition("begin");
             return true;
         }
-        if (text.equals("/my_age")) {
-            if (user.getAge() == -1)
-                sendMessage(message, "Я не знаю вашего возраста");
-            else
-                sendMessage(message, "Ваш возраст: " + user.getAge());
+        if (text.equals("/level")){
+            sendMessage(message, "Уровень сложности: " + user.getLevel());
             return true;
         }
-        if (text.equals("/change_family")) {
-            sendMessage(message, "Введите вашу фамилию");
-            user.setCommand("family");
-            return true;
-        }
-        if (text.equals("/change_name")) {
-            sendMessage(message, "Введите ваше новое имя");
-            user.setCommand("name");
-            return true;
-        }
-        if (text.equals("/change_age")) {
-            sendMessage(message, "Введите ваш возраст");
-            user.setCommand("age");
+        if (text.equals("/change_level")){
+            sendMessage(message, "Выберите уровень сложности: лёгкий, средний, сложный или ХАРД");
+            user.setCondition("change_level");
             return true;
         }
         return false;
@@ -113,72 +108,89 @@ public class Bot extends TelegramLongPollingBot {
         String text = message.getText();
         long id = message.getChatId();
         User user = users.get(id);
-        String command = user.getCommand();
-        if (command.equals(""))
+        String condition = user.getCondition();
+        if (condition.equals(""))
             return false;
         if (text.equals("/stop")) {
-            sendMessage(message, "Команда успешно прервана");
-            user.setCommand("");
+            logOut(message);
             return true;
         }
-        if (command.equals("family")) {
-            user.setSecondName(text);
-            sendMessage(message, "Ваша фамилия сохранена успешно!");
-            user.setCommand("");
+        if (condition.equals("begin")) {
+            System.out.println("condition begin");
+            if (text.equals("Да") || text.equals("да")){
+                user.setCondition("SendImage");
+                user.startGame(getRandomTown());
+                sendMessage(message, "Что это за город? (Ответ на русском языке)");
+                sendImage(message, user.getImageURL());
+                return true;
+            }
+            if (text.equals("Нет") || text.equals("нет")){
+                logOut(message);
+                return true;
+            }
+            sendMessage(message, "я тебя не понимаю");
             return true;
         }
-        if (command.equals("name")) {
-            user.setName(text);
-            sendMessage(message, "Ваше новое имя сохранено сохранена успешно!");
-            user.setCommand("");
+        if (condition.equals("SendImage")) {
+            if (text.equals(user.getTown())){
+                //win
+                sendMessage(message, "Мои поздравления! Ты угадал! Хочешь ещё?");
+                sendMessage(message, "Очков набрано: " + user.getPoints());
+                user.setCondition("begin");
+                return true;
+            }
+            if (user.isEnd()){
+                //lose
+                sendMessage(message, "Ты не силён в географии. Это город: " + user.getTown()+". Может ещё?");
+                user.setCondition("begin");
+                return true;
+            }
+            sendMessage(message, "Ты ошибся( Это не " + text + ". Попробуй ещё раз)");
+            sendImage(message, user.getImageURL());
             return true;
         }
-        if (command.equals("newUser")) {
-            user.setName(text);
-            sendMessage(message, "Приятно познакомится, " + text);
-            user.setCommand("");
-            return true;
-        }
-        if (command.equals("age")) {
-            try {
-                int age = Integer.parseInt(text);
-                if (age < 0 || 150 < age) {
-                    throw new IllegalArgumentException("no valid Age");
-                }
-                user.setAge(age);
-                sendMessage(message, "Ваш возраст успешно сохранён");
-                user.setCommand("");
-            } catch (Exception e) {
-                e.printStackTrace();
-                sendMessage(message, "Вы ввели неверный возраст, попробуйтне ещё раз");
+        if (condition.equals("change_level")) {
+            if (text.equals("лёгкий") || text.equals("средний") || text.equals("сложный") ||text.equals("ХАРД")){
+                user.setLevel(text);
+                user.setCondition("");
+                sendMessage(message, "Сложность успешно установлена");
+            }else{
+                sendMessage(message, "Выберите один из 4 вариантов ответа");
             }
             return true;
         }
 
         sendMessage(message, "Что-то пошло не так");
-        user.setCommand("");
+        user.setCondition("");
         return true;
     }
 
     private String textHelp() {
-        return "Привет, я бот из Легасофта и умею мого чего:\n" +
+        return "Привет, я бот для игры в города и умею мого чего:\n" +
                 "/help - выведет это сообщение,\n" +
-                "/start - начать работу с ботом с этой кнопки,\n" +
-                "/new_user - создаст нового пользователя, перезаписав старого,\n" +
-                "/my_name - выведет имя пользователя,\n" +
-                "/change_name - изменит имя пользователя,\n" +
-                "/my_family - выведет фамилию пользователя,\n" +
-                "/change_family - изменит фамилию пользователя,\n" +
-                "/my_age - выведет возраст пользователя,\n" +
-                "/change_age - изменит возраст пользователя,\n";
+                "/start - начать общение с ботом игру,\n" +
+                "/level - посмотреть урвень сложности,\n" +
+                "/change_level - изменить уровень сложности,\n" +
+                "/start_game - начать игру\n"+
+                "/stop  - остановить игру\n";
     }
 
+    private void sendImage(Message message, String url){
+        SendPhoto photo = new SendPhoto();
+        photo.setChatId(message.getChatId());
+        photo.setPhoto(url);
+        try {
+            execute(photo);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
 
     private void sendMessage(Message m, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(m.getChatId());
         message.setText(text);
-        setButtons(message);
+//        setButtons(message);
         try {
             execute(message);
         } catch (TelegramApiException e) {
@@ -193,7 +205,7 @@ public class Bot extends TelegramLongPollingBot {
         keyboard.setResizeKeyboard(true);
         keyboard.setOneTimeKeyboard(false);
 
-        List<KeyboardRow> rows = new ArrayList<>();
+        List<KeyboardRow> rows = new ArrayList<KeyboardRow>();
         KeyboardRow row1 = new KeyboardRow();
         row1.add(new KeyboardButton("/help"));
         row1.add(new KeyboardButton("/new_user"));
