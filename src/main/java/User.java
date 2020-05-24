@@ -4,6 +4,7 @@ public class User {
 
     private String name;
     private Long chatId;
+    private int room_id;
     private String town;
     private ImageLoader loader;
     private String condition;
@@ -16,6 +17,7 @@ public class User {
         chatId = id;
         condition = "";
         level = 3;
+        room_id = -1;
     }
 
     @Override
@@ -105,5 +107,13 @@ public class User {
     @Override
     public int hashCode() {
         return Objects.hash(chatId);
+    }
+
+    public int getRoom_id() {
+        return room_id;
+    }
+
+    public void setRoom_id(int room_id) {
+        this.room_id = room_id;
     }
 }

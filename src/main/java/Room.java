@@ -57,4 +57,9 @@ public class Room {
         }
         return builder.toString();
     }
+
+    @Override
+    public String toString() {
+        return "id=" + id + ", name=" + name;
+    }
 }

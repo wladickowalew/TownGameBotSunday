@@ -22,7 +22,8 @@ import java.util.List;
 
 public class Bot extends TelegramLongPollingBot {
 
-    public HashMap<Long, User> users = new HashMap<Long, User>();
+    public HashMap<Long, User> users = new HashMap<>();
+    public HashMap<Integer, Room> rooms = new HashMap<>();
 
     public static void main(String[] args) {
         ApiContextInitializer.init();
@@ -65,7 +66,7 @@ public class Bot extends TelegramLongPollingBot {
             return true;
         }
         if (text.equals("/start")) {
-            String name = "No name";
+            String name = message.getFrom().getFirstName() + " " + message.getFrom().getLastName();
             users.put(id, new User(message.getChatId(), name));
             sendMessage(message, "Приветствую тебя, пользователь! Вот, что я могу:");
             sendMessage(message, textHelp());
@@ -99,6 +100,42 @@ public class Bot extends TelegramLongPollingBot {
         if (text.equals("/change_level")){
             sendMessage(message, "Выберите уровень сложности: лёгкий, средний, сложный или ХАРД");
             user.setCondition("change_level");
+            return true;
+        }
+        if (text.equals("/new_room")){
+            sendMessage(message, "Введите название вашей комнаты");
+            user.setCondition("new_room");
+            return true;
+        }
+        if (text.equals("/remove_room")){
+            sendMessage(message, "Введите id комнаты");
+            user.setCondition("remove_room");
+            return true;
+        }
+        if (text.equals("/show_rooms")){
+            if (rooms.isEmpty()){
+                sendMessage(message, "Комнат нет");
+                return true;
+            }
+            StringBuilder builder = new StringBuilder();
+            for (Room room: rooms.values()){
+                builder.append(room.toString() + "\n");
+            }
+            sendMessage(message, builder.toString());
+            return true;
+        }
+        if (text.equals("/show_my_rooms")){
+            StringBuilder builder = new StringBuilder();
+            for (Room room: rooms.values()){
+                if (room.isRoot(user))
+                    builder.append(room.toString() + "\n");
+            }
+            String ans = builder.toString();
+            if (ans.equals("")){
+                sendMessage(message, "У вас нет комнат");
+            }else {
+                sendMessage(message, builder.toString());
+            }
             return true;
         }
         return false;
@@ -159,10 +196,42 @@ public class Bot extends TelegramLongPollingBot {
             }
             return true;
         }
-
+        if (condition.equals("new_room")) {
+            Room room = new Room(text, user);
+            rooms.put(room.getId(), room);
+            user.setCondition("");
+            sendMessage(message, "Вы создали комнату " + room);
+            return true;
+        }
+        if (condition.equals("remove_room")) {
+            int room_id = checkPermission(message, user);
+            if (room_id != -1) {
+                rooms.remove(room_id);
+                sendMessage(message, "Вы удалили комнату с id = "+ room_id);
+                user.setCondition("");
+            }
+            return true;
+        }
         sendMessage(message, "Что-то пошло не так");
         user.setCondition("");
         return true;
+    }
+
+    private int checkPermission(Message message, User user){
+        try{
+            int room_id = Integer.parseInt(message.getText());
+            if (rooms.get(room_id).isRoot(user))
+                return room_id;
+            else
+                sendMessage(message, "Вы не можете выполнить эту операцию");
+        }catch (NullPointerException e){
+            e.printStackTrace();
+            sendMessage(message, "Комнаты с таким id не существует");
+        }catch (Exception e){
+            e.printStackTrace();
+            sendMessage(message, "Я тебя не понимаю, введи id комнаты");
+        }
+        return -1;
     }
 
     private String textHelp() {
@@ -172,7 +241,11 @@ public class Bot extends TelegramLongPollingBot {
                 "/level - посмотреть урвень сложности,\n" +
                 "/change_level - изменить уровень сложности,\n" +
                 "/start_game - начать игру\n"+
-                "/stop  - остановить игру\n";
+                "/stop  - остановить игру\n"+
+                "/new_room - создать новую комнату,\n" +
+                "/remove_room - удалить комнату,\n" +
+                "/show_rooms - показать все комнаты\n"+
+                "/show_my_rooms - показать мои комнаты\n";
     }
 
     private void sendImage(Message message, String url){
