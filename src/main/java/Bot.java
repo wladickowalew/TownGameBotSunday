@@ -138,6 +138,25 @@ public class Bot extends TelegramLongPollingBot {
             }
             return true;
         }
+        if (text.equals("/to_room")){
+            sendMessage(message, "Введите id комнаты");
+            user.setCondition("to_room");
+            return true;
+        }
+        if (text.equals("/from_room")){
+            if(user.getRoom_id() == -1) {
+                sendMessage(message, "Вы не находитесь ни в комнате.");
+                return true;
+            }
+            rooms.get(user.getRoom_id()).removeUser(user);
+            sendMessage(message, "Вы вышли из комнаты.");
+            return true;
+        }
+        if (text.equals("/show_room_users")){
+            sendMessage(message, "Введите id комнаты");
+            user.setCondition("room_users");
+            return true;
+        }
         return false;
     }
 
@@ -204,26 +223,46 @@ public class Bot extends TelegramLongPollingBot {
             return true;
         }
         if (condition.equals("remove_room")) {
-            int room_id = checkPermission(message, user);
-            if (room_id != -1) {
+            int room_id = getRoomId(message, user);
+            if (room_id == -1)
+                return true;
+            if (rooms.get(room_id).isRoot(user)){
+                rooms.get(room_id).removeAllUsers();
                 rooms.remove(room_id);
                 sendMessage(message, "Вы удалили комнату с id = "+ room_id);
-                user.setCondition("");
-            }
+            }else
+                sendMessage(message, "Вы не можете выполнить эту операцию");
+            user.setCondition("");
             return true;
+        }
+        if (condition.equals("to_room")){
+            int room_id = getRoomId(message, user);
+            if(room_id == -1)
+                return true;
+            if(user.getRoom_id() != -1) {
+                sendMessage(message, "Вы уже находитесь в комнате. выйдете из неё, чтобы зайти в другую");
+                return true;
+            }
+            rooms.get(room_id).addUser(user);
+            sendMessage(message, "Вы зашли в комнату " + rooms.get(room_id));
+            user.setCondition("");
+            return true;
+        }
+        if (condition.equals("room_users")){
+            int room_id = getRoomId(message, user);
+            if(room_id == -1)
+                return true;
+            sendMessage(message, rooms.get(room_id).getUsers());
         }
         sendMessage(message, "Что-то пошло не так");
         user.setCondition("");
         return true;
     }
 
-    private int checkPermission(Message message, User user){
+    private int getRoomId(Message message, User user){
         try{
             int room_id = Integer.parseInt(message.getText());
-            if (rooms.get(room_id).isRoot(user))
-                return room_id;
-            else
-                sendMessage(message, "Вы не можете выполнить эту операцию");
+            return room_id;
         }catch (NullPointerException e){
             e.printStackTrace();
             sendMessage(message, "Комнаты с таким id не существует");
@@ -245,7 +284,10 @@ public class Bot extends TelegramLongPollingBot {
                 "/new_room - создать новую комнату,\n" +
                 "/remove_room - удалить комнату,\n" +
                 "/show_rooms - показать все комнаты\n"+
-                "/show_my_rooms - показать мои комнаты\n";
+                "/show_my_rooms - показать мои комнаты\n"+
+                "/to_room - войти в комнату\n" +
+                "/from_room - выйти из комнаты\n"+
+                "/show_room_users - показать пользователей в комнате\n";
     }
 
     private void sendImage(Message message, String url){

@@ -16,6 +16,15 @@ public class Room {
         this.root = user;
         this.name = name;
         users = new HashSet<>();
+        addUser(user);
+        user.setRoom_id(id);
+    }
+
+
+    public void removeAllUsers(){
+        for (User user: users){
+            removeUser(user);
+        }
     }
 
     public String getName() {
@@ -44,10 +53,12 @@ public class Room {
 
     public void addUser(User user){
         users.add(user);
+        user.setRoom_id(id);
     }
 
     public void removeUser(User user){
         users.remove(user);
+        user.setRoom_id(-1);
     }
 
     public String getUsers(){
