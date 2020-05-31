@@ -22,6 +22,23 @@ public class ImageLoader {
         imageUrls = getImageURLs(town);
     }
 
+    public ImageLoader(ImageLoader loader){
+        image_count = loader.getImage_count();
+        imageUrls = (ArrayList<String>) loader.getImageUrls().clone();
+    }
+
+    protected ImageLoader clone(){
+        return new ImageLoader(this);
+    }
+
+    public int getImage_count() {
+        return image_count;
+    }
+
+    public ArrayList<String> getImageUrls() {
+        return imageUrls;
+    }
+
     public boolean isEmpty(){
         return imageUrls.isEmpty();
     }

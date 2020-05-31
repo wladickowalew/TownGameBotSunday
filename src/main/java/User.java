@@ -11,6 +11,8 @@ public class User {
     private int level;
     private int attempts;
     private int points;
+    private boolean end_round;
+    private boolean game_in_room;
 
     public User(Long id, String name){
         this.name = name;
@@ -27,13 +29,46 @@ public class User {
 
     public void startGame(String town){
         this.town = town;
+        setAttempts();
+        loader = new ImageLoader(town, 5);
+        game_in_room = false;
+    }
+
+    public void startGameInRoom() {
+        game_in_room = true;
+        points = 0;
+        Main.sendMessage(chatId, "Игра в комнате началась!");
+    }
+
+    public void startRoundInRoom(ImageLoader loader, int round, String town) {
+        setTown(town);
+        setLoader(loader);
+        end_round = false;
+        setAttempts();
+        Main.sendMessage(chatId,"Раунд: " + (round+1));
+        setCondition("SendImage");
+        Main.sendImage(chatId, getImageURL());
+    }
+
+    public void end_room_game(String results){
+        condition = "";
+        Main.sendMessage(chatId, results);
+    }
+
+    public void end_round(boolean win){
+        end_round = true;
+        if (win)
+            points += (attempts + 1) * level;
+        condition = "waiting";
+    }
+
+    private void setAttempts(){
         switch (level){
             case 1:  attempts = 8; break;
             case 3:  attempts = 5; break;
             case 7:  attempts = 3; break;
             case 40: attempts = 1; break;
         }
-        loader = new ImageLoader(town, 5);
     }
 
     public String getName() {
@@ -68,7 +103,7 @@ public class User {
     }
 
     public int getPoints() {
-        return (attempts + 1) * level;
+        return points;
     }
 
     public boolean isEnd(){
@@ -115,5 +150,41 @@ public class User {
 
     public void setRoom_id(int room_id) {
         this.room_id = room_id;
+    }
+
+    public void setChatId(Long chatId) {
+        this.chatId = chatId;
+    }
+
+    public ImageLoader getLoader() {
+        return loader;
+    }
+
+    public void setLoader(ImageLoader loader) {
+        this.loader = loader;
+    }
+
+    public void setLevel(int level) {
+        this.level = level;
+    }
+
+    public void setPoints(int points) {
+        this.points = points;
+    }
+
+    public boolean isEnd_round() {
+        return end_round;
+    }
+
+    public void setEnd_round(boolean end_round) {
+        this.end_round = end_round;
+    }
+
+    public boolean isGame_in_room() {
+        return game_in_room;
+    }
+
+    public void setGame_in_room(boolean game_in_room) {
+        this.game_in_room = game_in_room;
     }
 }

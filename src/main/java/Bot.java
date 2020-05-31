@@ -25,21 +25,17 @@ public class Bot extends TelegramLongPollingBot {
     public HashMap<Long, User> users = new HashMap<>();
     public HashMap<Integer, Room> rooms = new HashMap<>();
 
-    public static void main(String[] args) {
+    public static Bot init() {
         ApiContextInitializer.init();
         TelegramBotsApi botapi = new TelegramBotsApi();
         try {
-            botapi.registerBot(new Bot());
+            Bot bot = new Bot();
+            botapi.registerBot(bot);
+            return bot;
         } catch (TelegramApiRequestException e) {
             e.printStackTrace();
         }
-    }
-
-    public String getRandomTown(){
-        String[] towns = {"Смоленск","Самара","Лондон","Торонто","Берлин","Токио","Пиза"};
-        int n = towns.length;
-        int r = (int)(Math.random() * n);
-        return  towns[r];
+        return null;
     }
 
     @Override
@@ -157,6 +153,16 @@ public class Bot extends TelegramLongPollingBot {
             user.setCondition("room_users");
             return true;
         }
+        if(text.equals("/start_room")){
+            int room_id = user.getRoom_id();
+            Room room = rooms.get(room_id);
+            if(room.isRoot(user)){
+                room.startRoom();
+            }else{
+                sendMessage(message, "Вы не можете запустить игру в этой комнате");
+                user.setCondition("");
+            }
+        }
         return false;
     }
 
@@ -175,7 +181,7 @@ public class Bot extends TelegramLongPollingBot {
             System.out.println("condition begin");
             if (text.equals("Да") || text.equals("да")){
                 user.setCondition("SendImage");
-                user.startGame(getRandomTown());
+                user.startGame(Main.getRandomTown());
                 sendMessage(message, "Что это за город? (Ответ на русском языке)");
                 sendImage(message, user.getImageURL());
                 return true;
@@ -190,15 +196,29 @@ public class Bot extends TelegramLongPollingBot {
         if (condition.equals("SendImage")) {
             if (text.equals(user.getTown())){
                 //win
-                sendMessage(message, "Мои поздравления! Ты угадал! Хочешь ещё?");
-                sendMessage(message, "Очков набрано: " + user.getPoints());
-                user.setCondition("begin");
+                if (user.isGame_in_room()){
+                    user.end_round(true);
+                    rooms.get(user.getRoom_id()).checkEndRound();
+                    sendMessage(message, "Ты угадал! Раунд Окончен! Ожидай начала другого раунда");
+                    sendMessage(message, "Очков всего набрано: " + user.getPoints());
+                }else {
+                    sendMessage(message, "Мои поздравления! Ты угадал! Хочешь ещё?");
+                    sendMessage(message, "Очков набрано: " + user.getPoints());
+                    user.setCondition("begin");
+                }
                 return true;
             }
             if (user.isEnd()){
                 //lose
-                sendMessage(message, "Ты не силён в географии. Это город: " + user.getTown()+". Может ещё?");
-                user.setCondition("begin");
+                if (user.isGame_in_room()){
+                    user.end_round(false);
+                    rooms.get(user.getRoom_id()).checkEndRound();
+                    sendMessage(message, "Ты не угадал! Раунд Окончен! Ожидай начала другого раунда");
+                    sendMessage(message, "Очков всего набрано: " + user.getPoints());
+                }else {
+                    sendMessage(message, "Ты не силён в географии. Это город: " + user.getTown()+". Может ещё?");
+                    user.setCondition("begin");
+                }
                 return true;
             }
             sendMessage(message, "Ты ошибся( Это не " + text + ". Попробуй ещё раз)");
@@ -253,6 +273,12 @@ public class Bot extends TelegramLongPollingBot {
             if(room_id == -1)
                 return true;
             sendMessage(message, rooms.get(room_id).getUsers());
+            user.setCondition("");
+            return true;
+        }
+        if(condition.equals("waiting")){
+            sendMessage(message, "Ожидайте продолжения...");
+            return true;
         }
         sendMessage(message, "Что-то пошло не так");
         user.setCondition("");
@@ -287,12 +313,13 @@ public class Bot extends TelegramLongPollingBot {
                 "/show_my_rooms - показать мои комнаты\n"+
                 "/to_room - войти в комнату\n" +
                 "/from_room - выйти из комнаты\n"+
-                "/show_room_users - показать пользователей в комнате\n";
+                "/show_room_users - показать пользователей в комнате\n"+
+                "/start_room - запустить игру в комнате";
     }
 
-    private void sendImage(Message message, String url){
+    public void sendImage(Long chatID, String url){
         SendPhoto photo = new SendPhoto();
-        photo.setChatId(message.getChatId());
+        photo.setChatId(chatID);
         photo.setPhoto(url);
         try {
             execute(photo);
@@ -301,16 +328,24 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendMessage(Message m, String text) {
+    private void sendImage(Message message, String url){
+        sendImage(message.getChatId(), url);
+    }
+
+    public void sendMessage(Long chatId, String text) {
         SendMessage message = new SendMessage();
-        message.setChatId(m.getChatId());
+        message.setChatId(chatId);
         message.setText(text);
-//        setButtons(message);
+        setButtons(message);
         try {
             execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+    }
+
+    private void sendMessage(Message m, String text) {
+        sendMessage(m.getChatId(), text);
     }
 
     public void setButtons(SendMessage message) {
@@ -322,12 +357,13 @@ public class Bot extends TelegramLongPollingBot {
 
         List<KeyboardRow> rows = new ArrayList<KeyboardRow>();
         KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton("/help"));
-        row1.add(new KeyboardButton("/new_user"));
+        row1.add(new KeyboardButton("/start"));
+        row1.add(new KeyboardButton("/new_room"));
+        row1.add(new KeyboardButton("/start_room"));
         rows.add(row1);
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton("/stop"));
+        row2.add(new KeyboardButton("/help"));
         rows.add(row2);
 
         keyboard.setKeyboard(rows);

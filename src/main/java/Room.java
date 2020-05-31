@@ -2,7 +2,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class Room {
-    private static  int id_generator = 0;
+    private static int id_generator = 0;
 
     private int id;
     private String name;
@@ -10,6 +10,8 @@ public class Room {
     private User root;
     private Set<User> users;
     private ImageLoader loader;
+    private int current_round;
+    private int rounds = 3;
 
     public Room(String name, User user){
         id = id_generator++;
@@ -18,6 +20,42 @@ public class Room {
         users = new HashSet<>();
         addUser(user);
         user.setRoom_id(id);
+    }
+
+    public void startRoom(){
+        System.out.println("Игра в комнате " + this + " началась");
+        current_round = 0;
+        for (User user: users){
+            user.startGameInRoom();
+        }
+        newRound();
+    }
+
+    public void newRound(){
+        this.town = Main.getRandomTown();
+        loader = new ImageLoader(town, 5);
+        for (User user: users){
+            user.startRoundInRoom(loader.clone(),current_round, town);
+        }
+    }
+
+    public void checkEndRound(){
+        for (User user: users){
+            if (!user.isEnd_round()) return;
+        }
+        if(++current_round < rounds){
+            newRound();
+        }else{
+            StringBuilder builder = new StringBuilder();
+            builder.append("Игра оконыена! Результаты:\n");
+            for (User user: users){
+                builder.append(user.getName() + ": " + user.getPoints()+ "\n");
+            }
+            String ans = builder.toString();
+            for (User user: users){
+                user.end_room_game(ans);
+            }
+        }
     }
 
 
